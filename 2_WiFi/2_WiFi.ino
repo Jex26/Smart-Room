@@ -15,8 +15,8 @@ Adafruit_SSD1306 OLED(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);  //Pantal
 
 // Constantes
 // Constantes Wi-Fi
-const char* ssid = "JEXX";          // Usuario
-const char* pass = "JeisonSolarte"; // Contraseña
+const char* ssid = "TU USUARIO";          // Usuario
+const char* pass = "TU CONTRASEÑA"; // Contraseña
 
 // Variables
 int i;  // Contador Multipropósito
