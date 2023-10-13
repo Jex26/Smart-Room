@@ -15,8 +15,8 @@ Adafruit_SSD1306 OLED(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);  //Pantal
 
 // Constantes
 // Constantes Wi-Fi
-const char* ssid = "JEXX";          // Usuario
-const char* pass = "JeisonSolarte"; // Contraseña
+const char* ssid = "JEXX";            // SSID
+const char* pass = "JeisonSolarte";   // Contraseña
 
 // Variables
 int i;  // Contador Multipropósito
@@ -70,18 +70,21 @@ void loop() {
 // Funciones de control -------------------------------------------------------
 // Conectar o reconectar WiFi
 void conectar_WiFi(){
-  i = 1;
+  i = 1; 
 
   escribir("Conectando Wifi",19,40);
   WiFi.begin(ssid, pass);
-  while(WiFi.status() != WL_CONNECTED and i < OLED.width()){
-    OLED.drawLine(0, 48, i, 48, SSD1306_WHITE);
+  while(WiFi.status() != WL_CONNECTED and i < SCREEN_WIDTH){
+    OLED.drawLine(0, 49, i, 49, SSD1306_WHITE);
     OLED.display();
     i++;
     delay(500);
   }
 
-  if(i < 65) escribir("Conectado a: " + String(ssid),0,50);
+  Serial.println("Dirección IP: ");
+  Serial.println(WiFi.localIP());
+
+  if(i < SCREEN_WIDTH) escribir("Conectado a: " + String(ssid),0,50);
   else escribir("Wifi no conectado",13,50);  
 
   task_done();
