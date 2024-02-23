@@ -11,7 +11,7 @@
 #define SCREEN_ADDRESS 0x3C  // Mirar Datasheet para la dirección; 0x3D for 128x64, 0x3C for 128x32
 
 // Instancias
-Adafruit_SSD1306 OLED(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);  //Pantalla OLED
+Adafruit_SSD1306 OLED(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);  // Pantalla OLED
 
 // Constantes
 // Constantes Wi-Fi
@@ -84,7 +84,7 @@ void conectar_WiFi(){
   Serial.println("Dirección IP: ");
   Serial.println(WiFi.localIP());
 
-  if(i < SCREEN_WIDTH) escribir("Conectado a: " + String(ssid),0,50);
+  if(WiFi.status() == WL_CONNECTED) escribir("Conectado a: " + String(ssid),0,50);
   else escribir("Wifi no conectado",13,50);  
 
   task_done();

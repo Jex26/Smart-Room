@@ -22,7 +22,7 @@
 // Instancias
 Adafruit_SSD1306 OLED(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);  // Pantalla OLED
 DHT dht(DHT_PIN, DHT11);                                                // Sesor DHT11
-tm reloj;                                                               // Reloj de tiempo real (RTC)
+struct tm reloj;                                                               // Reloj de tiempo real (RTC)
 
 // Constantes
 // Constantes Wi-Fi
@@ -30,8 +30,8 @@ const char* ssid = "JEXX";          // Usuario
 const char* pass = "JeisonSolarte"; // Contraseña
 
 // Variables
-float temperatura = 0, humedad = 0; // Temperatura y la humedad
-int i;                              // Contador Multipropósito
+float temp = 0, hum = 0;  // Temperatura y Humedad
+int i;                    // Contador Multipropósito
 
 // ----------------------- Funciones de Interrupción ----------------------- //
 
@@ -83,8 +83,9 @@ void loop() {
   // Control Wifi  
   if(WiFi.status() != WL_CONNECTED) conectar_WiFi();
 
-  // Control de Temperatura y Humedad
-  temperatura_y_humedad();  
+  // Leer Temperatura y Humedad
+  temp = dht.readTemperature();
+  hum = dht.readHumidity();
 
   // Mostrar datos
   pantalla_principal();
@@ -106,28 +107,14 @@ void conectar_WiFi(){
     delay(500);
   }
 
-  if(i < 65) escribir("Conectado a: " + String(ssid),0,50);
+  Serial.println("Dirección IP: ");
+  Serial.println(WiFi.localIP());
+
+  if(WiFi.status() == WL_CONNECTED) escribir("Conectado a: " + String(ssid),0,50);
   else escribir("Wifi no conectado",13,50);  
 
   task_done();
   delay(1000);
-}
-
-// Control de Temperatura y Humedad
-void temperatura_y_humedad(){
-  float t = dht.readTemperature();
-  float h = dht.readHumidity();
-
-  if(!isnan(t) and !isnan(h)){
-    if(t != temperatura or h != humedad){
-      temperatura = t;
-      humedad = h;
-      task_done();
-    }
-  }else {
-    temperatura = 0;
-    humedad = 0;    
-  }
 }
 
 // Funciones Generales --------------------------------------------------------
@@ -143,7 +130,7 @@ void pantalla_principal(){
 
   // Mostrar Temperatura y humedad
   OLED.setCursor(0,8);
-  if(temperatura != 0 and humedad != 0) OLED.printf("Temperatura:%2.1f%cC\nHumedad:%2.0f%c",temperatura,167,humedad,37);
+  if(!isnan(temp) and !isnan(hum)) OLED.printf("Temperatura:%2.1f%cC\nHumedad:%2.0f%c",temp,167,hum,37);
   else OLED.print("Error en sensor DHT11");
 
   // Mostrar estado sensor SR501

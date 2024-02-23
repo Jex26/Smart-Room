@@ -26,7 +26,7 @@
 
 // Instancias
 Adafruit_SSD1306 OLED(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);  // Pantalla OLED
-hw_timer_t* tempo = NULL;                                               // Temporizador
+hw_timer_t *tempo = NULL;                                               // Temporizador
 DHT dht(DHT_PIN, DHT11);                                                // Sesor DHT11
 tm reloj;                                                               // Reloj de tiempo real (RTC)
 
@@ -36,26 +36,24 @@ const char* ssid = "JEXX";          // Usuario
 const char* pass = "JeisonSolarte"; // Contraseña
 
 // Variables
-float temperatura = 0, humedad = 0; // Temperatura y la humedad
-char* estado_SR501 = "OFF";         // Estado del sensor SR501
-volatile bool estado = 0;           // Estado de interrupciones
-int i;                              // Contador Multipropósito
+volatile bool estado = false; // Estado de interrupciones
+char *estado_SR501 = "OFF";   // Estado del sensor SR501
+float temp = 0, hum = 0;      // Temperatura y humedad
+int i;                        // Contador Multipropósito
 
 // ----------------------- Funciones de Interrupción ----------------------- //
 // Encender luz de gradas -----------------------------------------------------
 void IRAM_ATTR gradas_on(){
   digitalWrite(GRADAS, LOW);
   timerStart(tempo);
-  timerAlarmEnable(tempo);
-  estado = 1;
+  estado = true;
 }
 
 // Apagar luz de gradas -------------------------------------------------------
 void IRAM_ATTR gradas_off(){
   digitalWrite(GRADAS, HIGH);
   timerStop(tempo);
-  timerAlarmDisable(tempo);
-  estado = 0;
+  estado = false;
 }
 
 // --------------------------- Cuerpo del código --------------------------- //
@@ -102,17 +100,18 @@ void setup() {
 
   // Configuración SR-501
   escribir("Configurando SR501", 10, 16);
-  while (!getLocalTime(&reloj)) delay();
-  int hora = reloj.tm_hour;
-  if(hora>17 or hora<6){
+  while (!getLocalTime(&reloj)) delay(1);
+  int aux = reloj.tm_hour;                // Hora, formato: 24h
+  if(aux>17 or aux<6){
     digitalWrite(TRANSISTOR, LOW);
     estado_SR501 = "ON";    
   }
 
   //Configurar Temporizador
   escribir("Conf. Temporizador", 10, 24);
-  //f = 80M hz/50k = 1600 Hz; T = 1/1600 Hz = 625 us
-  tempo = timerBegin(0, 50000, true);   //(Canal, divisor, hacia arriba) Div. Max: 65535
+  //f = 80e6/50e3 = 1600 Hz; T = 1/1600 s = 625 us
+  tempo = timerBegin(0, 50000, false);  //(Canal, divisor, hacia abajo) Div. Max: 65535
+  timerWrite(tempo, 15*1600);
   timerStop(tempo);
   task_done();
     
@@ -122,7 +121,8 @@ void setup() {
   timerAttachInterrupt(tempo, gradas_off, true);  // (temporizador, funcion, edge)
   
   //Evento temporizador. EJ: Para 1s -> veces = 1/625u = 1600
-  timerAlarmWrite(tempo, 15*1600, true);          // (temporizador, veces, resetear)
+  timerAlarmWrite(tempo, 0, true);          // (temporizador, veces, resetear)
+  timerAlarmEnable(tempo);
   task_done();
 
   delay(1000);
@@ -133,8 +133,9 @@ void loop() {
   // Control Wifi  
   if(WiFi.status() != WL_CONNECTED) conectar_WiFi();
 
-  // Control de Temperatura y Humedad
-  temperatura_y_humedad();
+  // Leer Temperatura y Humedad
+  temp = dht.readTemperature();
+  hum = dht.readHumidity();
 
   // Control temporal
   temporal();
@@ -159,28 +160,14 @@ void conectar_WiFi(){
     delay(500);
   }
 
-  if(i < 65) escribir("Conectado a: " + String(ssid),0,50);
-  else escribir("Wifi no conectado",13,50);  
+  Serial.println("Dirección IP: ");
+  Serial.println(WiFi.localIP());
+
+  if(WiFi.status() == WL_CONNECTED) escribir("Conectado a: " + String(ssid),0,50);
+  else escribir("Wifi no conectado",13,50);    
 
   task_done();
   delay(1000);
-}
-
-// Control de Temperatura y Humedad
-void temperatura_y_humedad(){
-  float t = dht.readTemperature();
-  float h = dht.readHumidity();
-
-  if(!isnan(t) and !isnan(h)){
-    if(t != temperatura or h != humedad){
-      temperatura = t;
-      humedad = h;
-      task_done();
-    }
-  }else {
-    temperatura = 0;
-    humedad = 0;    
-  }
 }
 
 // Control cada hora
@@ -216,16 +203,20 @@ void pantalla_principal(){
 
   // Mostrar Temperatura y humedad
   OLED.setCursor(0,8);
-  if(temperatura != 0 and humedad != 0) OLED.printf("Temperatura:%2.1f%cC\nHumedad:%2.0f%c",temperatura,167,humedad,37);
+  if(!isnan(temp) and !isnan(hum)) OLED.printf("Temperatura:%2.1f%cC\nHumedad:%2.0f%c",temp,167,hum,37);
   else OLED.print("Error en sensor DHT11");
 
-  // Mostrar estado sensor SR501
+  // Mostrar estado del SR-501 y la interrupciones
   OLED.setCursor(0, 24);
   OLED.print("Sensor SR-501:" + String(estado_SR501));
+  
+  if(estado){
+    OLED.printf(" %2.0f", timerReadSeconds(tempo));
+    OLED.fillCircle(124,27,3,SSD1306_WHITE);
+  }
+  else OLED.drawCircle(124,27,3,SSD1306_WHITE);
 
   // Mostrar información de luces
-  if(estado) task_done();
-
   OLED.setCursor(0, 32);
   OLED.print("Luces:0");
 

@@ -16,7 +16,7 @@
 #define UTC_OFFSET_DST 0
 
 // Instancias
-Adafruit_SSD1306 OLED(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);  //Pantalla OLED
+Adafruit_SSD1306 OLED(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);  // Pantalla OLED
 struct tm reloj;                                                        // Reloj de tiempo real (RTC)
 
 // Constantes
@@ -95,7 +95,7 @@ void conectar_WiFi(){
   Serial.println("Dirección IP: ");
   Serial.println(WiFi.localIP());
 
-  if(i < SCREEN_WIDTH) escribir("Conectado a: " + String(ssid),0,50);
+  if(WiFi.status() == WL_CONNECTED) escribir("Conectado a: " + String(ssid),0,50);
   else escribir("Wifi no conectado",13,50);  
 
   task_done();
@@ -117,7 +117,7 @@ void pantalla_principal(){
   OLED.setCursor(0,8);
   OLED.printf("Temperatura:00.0%cC\nHumedad:00%c",167,37);
 
-    // Mostrar estado sensor SR501
+  // Mostrar estado sensor SR501
   OLED.setCursor(0, 24);
   OLED.print("Sensor SR-501:OFF");
 
