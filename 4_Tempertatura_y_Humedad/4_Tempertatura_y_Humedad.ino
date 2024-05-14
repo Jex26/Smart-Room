@@ -22,12 +22,12 @@
 // Instancias
 Adafruit_SSD1306 OLED(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);  // Pantalla OLED
 DHT dht(DHT_PIN, DHT11);                                                // Sesor DHT11
-struct tm reloj;                                                               // Reloj de tiempo real (RTC)
+struct tm reloj;                                                        // Reloj de tiempo real (RTC)
 
 // Constantes
 // Constantes Wi-Fi
-const char* ssid = "JEXX";          // Usuario
-const char* pass = "JeisonSolarte"; // Contraseña
+const char* ssid = "tu usuario";      // SSID
+const char* pass = "tu contraseña";   // Contraseña
 
 // Variables
 float temp = 0, hum = 0;  // Temperatura y Humedad
@@ -106,9 +106,6 @@ void conectar_WiFi(){
     i++;
     delay(500);
   }
-
-  Serial.println("Dirección IP: ");
-  Serial.println(WiFi.localIP());
 
   if(WiFi.status() == WL_CONNECTED) escribir("Conectado a: " + String(ssid),0,50);
   else escribir("Wifi no conectado",13,50);  

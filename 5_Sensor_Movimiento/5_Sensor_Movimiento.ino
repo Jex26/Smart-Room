@@ -28,16 +28,16 @@
 Adafruit_SSD1306 OLED(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);  // Pantalla OLED
 hw_timer_t *tempo = NULL;                                               // Temporizador
 DHT dht(DHT_PIN, DHT11);                                                // Sesor DHT11
-tm reloj;                                                               // Reloj de tiempo real (RTC)
+struct tm reloj;                                                        // Reloj de tiempo real (RTC)
 
 // Constantes
 // Constantes Wi-Fi
-const char* ssid = "JEXX";          // Usuario
-const char* pass = "JeisonSolarte"; // Contraseña
+const char* ssid = "tu usuario";      // SSID
+const char* pass = "tu contraseña";   // Contraseña
 
 // Variables
 volatile bool estado = false; // Estado de interrupciones
-char *estado_SR501 = "OFF";   // Estado del sensor SR501
+char *estado_SR501 = "ON";    // Estado del sensor SR501
 float temp = 0, hum = 0;      // Temperatura y humedad
 int i;                        // Contador Multipropósito
 
@@ -63,11 +63,12 @@ void setup() {
   Serial.begin(115200);
 
   // Configuración de puertos
-  int salidas[] = {LED_BUILTIN, TRANSISTOR, GRADAS};
+  int salidas[] = {LED_BUILTIN, GRADAS, TRANSISTOR};
   for (i=0; i<sizeof(salidas)/sizeof(salidas[0]); i++){
     pinMode(salidas[i], OUTPUT);
     digitalWrite(salidas[i], HIGH);
   }
+  digitalWrite(TRANSISTOR,LOW);
   task_done();
   // Entradas
   pinMode(SR501_PIN, PULLDOWN);
@@ -102,9 +103,9 @@ void setup() {
   escribir("Configurando SR501", 10, 16);
   while (!getLocalTime(&reloj)) delay(1);
   int aux = reloj.tm_hour;                // Hora, formato: 24h
-  if(aux>17 or aux<6){
+  if(aux>5 && aux<19){
     digitalWrite(TRANSISTOR, LOW);
-    estado_SR501 = "ON";    
+    estado_SR501 = "OFF";    
   }
 
   //Configurar Temporizador
@@ -160,9 +161,6 @@ void conectar_WiFi(){
     delay(500);
   }
 
-  Serial.println("Dirección IP: ");
-  Serial.println(WiFi.localIP());
-
   if(WiFi.status() == WL_CONNECTED) escribir("Conectado a: " + String(ssid),0,50);
   else escribir("Wifi no conectado",13,50);    
 
@@ -173,20 +171,23 @@ void conectar_WiFi(){
 // Control cada hora
 void temporal(){
   if(reloj.tm_sec == 0 and reloj.tm_min == 0){
+    int t = millis();
     switch(reloj.tm_hour){
       case 6:
-        digitalWrite(TRANSISTOR, HIGH);
+        digitalWrite(TRANSISTOR, LOW);
         estado_SR501 = "OFF";
       break;
       case 18:
-        digitalWrite(TRANSISTOR, LOW);
+        digitalWrite(TRANSISTOR, HIGH);
         estado_SR501 = "ON";
       break;
       default: break;      
     }
 
     // ThingSpeak
-    task_done();    
+    task_done();   
+    t = millis()-t;
+    if(t<1e3) delay(1e3-t); 
   }  
 }
 

@@ -24,7 +24,6 @@ void setup() {
     digitalWrite(salidas[i], HIGH);
   }
   task_done();
-  
 }
 
 // Bucle ----------------------------------------------------------------------

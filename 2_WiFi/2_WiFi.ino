@@ -15,8 +15,8 @@ Adafruit_SSD1306 OLED(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);  // Panta
 
 // Constantes
 // Constantes Wi-Fi
-const char* ssid = "JEXX";            // SSID
-const char* pass = "JeisonSolarte";   // Contraseña
+const char* ssid = "tu usuario";      // SSID
+const char* pass = "tu contraseña";   // Contraseña
 
 // Variables
 int i;  // Contador Multipropósito
@@ -52,7 +52,6 @@ void setup() {
   // Configuración Wi-Fi
   conectar_WiFi();
 
-
   delay(1000);
 }
 
@@ -80,9 +79,6 @@ void conectar_WiFi(){
     i++;
     delay(500);
   }
-
-  Serial.println("Dirección IP: ");
-  Serial.println(WiFi.localIP());
 
   if(WiFi.status() == WL_CONNECTED) escribir("Conectado a: " + String(ssid),0,50);
   else escribir("Wifi no conectado",13,50);  

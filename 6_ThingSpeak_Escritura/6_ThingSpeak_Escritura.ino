@@ -27,14 +27,16 @@
 
 // ThingSpeak
 #define CHANNEL_ID    2004303             // ID de Canal en ThingSpeak
-#define READ_API_KEY  "JWGMPQAVST3SQDTM"  // Read API Key
 #define WRITE_API_KEY "WR1F0S98EBZG724Q"  // Write API Key
+#define READ_API_KEY  "JWGMPQAVST3SQDTM"  // Read API Key
+
 
 // Instancias
 Adafruit_SSD1306 OLED(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);  // Pantalla OLED
 hw_timer_t* tempo = NULL;                                               // Temporizador
 DHT dht(DHT_PIN, DHT11);                                                // Sesor DHT11
-tm reloj;                                                               // Reloj de tiempo real (RTC)
+WiFiClient client;                                                      // Cliente WiFi
+struct tm reloj;                                                        // Reloj de tiempo real (RTC)
 
 // Constantes
 // Constantes Wi-Fi
@@ -42,26 +44,25 @@ const char* ssid = "JEXX";          // Usuario
 const char* pass = "JeisonSolarte"; // Contraseña
 
 // Variables
-float temperatura = 0, humedad = 0; // Temperatura y la humedad
-char* estado_SR501 = "OFF";         // Estado del sensor SR501
-volatile bool estado = 0;           // Estado de interrupciones
-int i;                              // Contador Multipropósito
+volatile bool estado = false; // Estado de interrupciones
+char *estado_SR501 = "ON";    // Estado del sensor SR501
+float temp = 0, hum = 0;      // Temperatura y humedad
+int i;                        // Contador Multipropósito
+bool b = true;
 
 // ----------------------- Funciones de Interrupción ----------------------- //
 // Encender luz de gradas -----------------------------------------------------
 void IRAM_ATTR gradas_on(){
   digitalWrite(GRADAS, LOW);
   timerStart(tempo);
-  timerAlarmEnable(tempo);
-  estado = 1;
+  estado = false;
 }
 
 // Apagar luz de gradas -------------------------------------------------------
 void IRAM_ATTR gradas_off(){
   digitalWrite(GRADAS, HIGH);
   timerStop(tempo);
-  timerAlarmDisable(tempo);
-  estado = 0;
+  estado = false;
 }
 
 // --------------------------- Cuerpo del código --------------------------- //
@@ -71,11 +72,12 @@ void setup() {
   Serial.begin(115200);
 
   // Configuración de puertos
-  int salidas[] = {LED_BUILTIN, TRANSISTOR, GRADAS};
+  int salidas[] = {LED_BUILTIN, GRADAS, TRANSISTOR};
   for (i=0; i<sizeof(salidas)/sizeof(salidas[0]); i++){
     pinMode(salidas[i], OUTPUT);
     digitalWrite(salidas[i], HIGH);
   }
+  digitalWrite(TRANSISTOR,LOW);
   task_done();
   // Entradas
   pinMode(SR501_PIN, PULLDOWN);
@@ -108,17 +110,18 @@ void setup() {
 
   // Configuración SR-501
   escribir("Configurando SR501", 10, 16);
-  while (!getLocalTime(&reloj)) delay(200);
-  int hora = reloj.tm_hour;
-  if(hora>17 or hora<6){
+  while (!getLocalTime(&reloj)) delay(1);
+  int aux = reloj.tm_hour;
+  if(aux>5 && aux<19){
     digitalWrite(TRANSISTOR, LOW);
-    estado_SR501 = "ON";    
+    estado_SR501 = "OFF";    
   }
 
   //Configurar Temporizador
   escribir("Conf. Temporizador", 10, 24);
   //f = 80M hz/50k = 1600 Hz; T = 1/1600 Hz = 625 us
-  tempo = timerBegin(0, 50000, true);   //(Canal, divisor, hacia arriba) Div. Max: 65535
+  tempo = timerBegin(0, 50000, false);  //(Canal, divisor, hacia abajo) Div. Max: 65535
+  timerWrite(tempo, 15*1600);
   timerStop(tempo);
   task_done();
     
@@ -128,8 +131,13 @@ void setup() {
   timerAttachInterrupt(tempo, gradas_off, true);  // (temporizador, funcion, edge)
   
   //Evento temporizador. EJ: Para 1s -> veces = 1/625u = 1600
-  timerAlarmWrite(tempo, 15*1600, true);          // (temporizador, veces, resetear)
+  timerAlarmWrite(tempo, 0, true);          // (temporizador, veces, resetear)
+  timerAlarmEnable(tempo); 
   task_done();
+
+  // Configuración ThingSpeak
+  escribir("Config. ThingSpeak", 10, 40);
+  ThingSpeak.begin(client);
 
   delay(1000);
 }
@@ -139,8 +147,9 @@ void loop() {
   // Control Wifi  
   if(WiFi.status() != WL_CONNECTED) conectar_WiFi();
 
-  // Control de Temperatura y Humedad
-  temperatura_y_humedad();
+  // Leer Temperatura y Humedad
+  temp = dht.readTemperature();
+  hum = dht.readHumidity();
 
   // Control temporal
   temporal();
@@ -165,54 +174,40 @@ void conectar_WiFi(){
     delay(500);
   }
 
-  if(i < 65) escribir("Conectado a: " + String(ssid),0,50);
+  if(WiFi.status() == WL_CONNECTED) escribir("Conectado a: " + String(ssid),0,50);
   else escribir("Wifi no conectado",13,50);  
 
   task_done();
   delay(1000);
 }
 
-// Control de Temperatura y Humedad
-void temperatura_y_humedad(){
-  float t = dht.readTemperature();
-  float h = dht.readHumidity();
-
-  if(!isnan(t) and !isnan(h)){
-    if(t != temperatura or h != humedad){
-      temperatura = t;
-      humedad = h;
-      task_done();
-    }
-  }else {
-    temperatura = 0;
-    humedad = 0;    
-  }
-}
-
 // Control cada hora
 void temporal(){
   if(reloj.tm_sec == 0 and reloj.tm_min == 0){
+    int t = millis();
     switch(reloj.tm_hour){
       case 6:
-        digitalWrite(TRANSISTOR, HIGH);
+        digitalWrite(TRANSISTOR, LOW);
         estado_SR501 = "OFF";
       break;
       case 18:
-        digitalWrite(TRANSISTOR, LOW);
-        estado_SR501 = "ON";
+        digitalWrite(TRANSISTOR, HIGH);
+        estado_SR501 = "ON";        
       break;
       default: break;      
     }
 
     // Escribir Temperatura y humedad en ThingSpeak
-    while(ThingSpeak.setField(1,temperatura) != 200);
-    while(ThingSpeak.setField(2,humedad) != 200);
+    while(ThingSpeak.setField(1,temp) != 200);
+    while(ThingSpeak.setField(2,hum) != 200);
     while(ThingSpeak.writeFields(CHANNEL_ID, WRITE_API_KEY) != 200);
     
     task_done();    
-    delay(1000);
-  }  
+    t = millis()-t;
+    if(t<1e3) delay(1e3-t);
+  }
 }
+
 
 // Funciones Generales --------------------------------------------------------
 // Pantalla principal con la información relevante
@@ -227,16 +222,20 @@ void pantalla_principal(){
 
   // Mostrar Temperatura y humedad
   OLED.setCursor(0,8);
-  if(temperatura != 0 and humedad != 0) OLED.printf("Temperatura:%2.1f%cC\nHumedad:%2.0f%c",temperatura,167,humedad,37);
+  if(!isnan(temp) and !isnan(hum)) OLED.printf("Temperatura:%2.1f%cC\nHumedad:%2.0f%c",temp,167,hum,37);
   else OLED.print("Error en sensor DHT11");
 
-  // Mostrar estado sensor SR501
+  // Mostrar estado del SR-501 y la interrupciones
   OLED.setCursor(0, 24);
   OLED.print("Sensor SR-501:" + String(estado_SR501));
 
-  // Mostrar información de luces
-  if(estado) task_done();
+  if(estado){
+    OLED.printf(" %2.0f", timerReadSeconds(tempo));
+    OLED.fillCircle(124,27,3,SSD1306_WHITE);
+  }
+  else OLED.drawCircle(124,27,3,SSD1306_WHITE);
 
+  // Mostrar información de luces
   OLED.setCursor(0, 32);
   OLED.print("Luces:0");
 
